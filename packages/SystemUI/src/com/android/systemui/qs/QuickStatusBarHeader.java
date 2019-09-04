@@ -81,7 +81,6 @@ import com.android.systemui.statusbar.policy.NextAlarmController;
 import com.android.systemui.statusbar.policy.ZenModeController;
 import com.android.systemui.tuner.TunerService;
 
-import lineageos.providers.LineageSettings;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -156,10 +155,6 @@ public class QuickStatusBarHeader extends RelativeLayout implements
     private BatteryMeterView mBatteryRemainingIcon;
     private boolean mPermissionsHubEnabled;
 
-    private View mQuickQsBrightness;
-    private BrightnessController mBrightnessController;
-    private boolean mIsQuickQsBrightnessEnabled;
-    private boolean mIsQsAutoBrightnessEnabled;
 
     private PrivacyItemController mPrivacyItemController;
 
@@ -278,9 +273,6 @@ public class QuickStatusBarHeader extends RelativeLayout implements
         DeviceConfig.addOnPropertyChangedListener(DeviceConfig.NAMESPACE_PRIVACY,
                 mContext.getMainExecutor(), mPropertyListener);
 
-        Dependency.get(TunerService.class).addTunable(this,
-                StatusBarIconController.ICON_BLACKLIST,
-                QS_SHOW_AUTO_BRIGHTNESS, QS_SHOW_BRIGHTNESS_SLIDER);
     }
 
     private List<String> getIgnoredIconSlots() {
@@ -512,13 +504,6 @@ public class QuickStatusBarHeader extends RelativeLayout implements
             mPrivacyChipAlphaAnimator.setPosition(keyguardExpansionFraction);
         }
 
-        if (mIsQuickQsBrightnessEnabled) {
-            if (keyguardExpansionFraction > 0) {
-                mQuickQsBrightness.setVisibility(INVISIBLE);
-            } else {
-                mQuickQsBrightness.setVisibility(VISIBLE);
-            }
-        }
     }
 
     public void disable(int state1, int state2, boolean animate) {
@@ -572,12 +557,7 @@ public class QuickStatusBarHeader extends RelativeLayout implements
         }
         mSpace.setLayoutParams(lp);
         setChipVisibility(mPrivacyChip.getVisibility() == View.VISIBLE);
-        // Offset container padding to align with QS brightness bar.
-        final int sp = getResources().getDimensionPixelSize(R.dimen.notification_side_paddings);
-        RelativeLayout.LayoutParams lpQuickQsBrightness = (RelativeLayout.LayoutParams)
-                mQuickQsBrightness.getLayoutParams();
-        lpQuickQsBrightness.setMargins(sp - mPaddingLeft, 0, sp - mPaddingRight, 0);
-        mQuickQsBrightness.setLayoutParams(lpQuickQsBrightness);
+
         return super.onApplyWindowInsets(insets);
     }
 
@@ -603,13 +583,13 @@ public class QuickStatusBarHeader extends RelativeLayout implements
             mContext.registerReceiver(mRingerReceiver,
                     new IntentFilter(AudioManager.INTERNAL_RINGER_MODE_CHANGED_ACTION));
             mPrivacyItemController.addCallback(mPICCallback);
-            mBrightnessController.registerCallbacks();
+
         } else {
             mZenController.removeCallback(this);
             mAlarmController.removeCallback(this);
             mPrivacyItemController.removeCallback(mPICCallback);
             mContext.unregisterReceiver(mRingerReceiver);
-            mBrightnessController.unregisterCallbacks();
+
             mPrivacyChipLogged = false;
         }
     }
