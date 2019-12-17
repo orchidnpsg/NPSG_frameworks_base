@@ -1252,9 +1252,7 @@ public final class Settings {
             }
             return false;
         }
-        if (alsoResetStatus) {
-            ps.clearDomainVerificationStatusForUser(userId);
-        }
+        ps.clearDomainVerificationStatusForUser(userId);
         ps.setIntentFilterVerificationInfo(null);
         return true;
     }

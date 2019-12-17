@@ -18236,18 +18236,16 @@ public class PackageManagerService extends IPackageManager.Stub
 
         int count = 0;
         final String packageName = pkg.packageName;
+
         boolean handlesWebUris = false;
-        ArraySet<String> domains = new ArraySet<>();
-        final boolean previouslyVerified;
-        boolean hostSetExpanded = false;
-        boolean needToRunVerify = false;
+        final boolean alreadyVerified;
         synchronized (mPackages) {
             // If this is a new install and we see that we've already run verification for this
             // package, we have nothing to do: it means the state was restored from backup.
-            IntentFilterVerificationInfo ivi =
+            final IntentFilterVerificationInfo ivi =
                     mSettings.getIntentFilterVerificationLPr(packageName);
-            previouslyVerified = (ivi != null);
-            if (!replacing && previouslyVerified) {
+            alreadyVerified = (ivi != null);
+            if (!replacing && alreadyVerified) {
                 if (DEBUG_DOMAIN_VERIFICATION) {
                     Slog.i(TAG, "Package " + packageName + " already verified: status="
                             + ivi.getStatusString());
@@ -18255,36 +18253,33 @@ public class PackageManagerService extends IPackageManager.Stub
                 return;
             }
 
-            if (DEBUG_DOMAIN_VERIFICATION) {
-                Slog.i(TAG, "    Previous verified hosts: "
-                        + (ivi == null ? "[none]" : ivi.getDomainsString()));
-            }
-
             // If any filters need to be verified, then all need to be.  In addition, we need to
             // know whether an updating app has any web navigation intent filters, to re-
             // examine handling policy even if not re-verifying.
-            final boolean needsVerification = needsNetworkVerificationLPr(packageName);
+            boolean needToVerify = false;
             for (PackageParser.Activity a : pkg.activities) {
                 for (ActivityIntentInfo filter : a.intents) {
                     if (filter.handlesWebUris(true)) {
                         handlesWebUris = true;
                     }
-                    if (needsVerification && filter.needsVerification()) {
-                        if (DEBUG_DOMAIN_VERIFICATION) {
-                            Slog.d(TAG, "autoVerify requested, processing all filters");
+                    if (filter.needsVerification() && needsNetworkVerificationLPr(filter)) {
                         }
                         needToRunVerify = true;
                         // It's safe to break out here because filter.needsVerification()
                         // can only be true if filter.handlesWebUris(true) returned true, so
+                        needToVerify = true;
+                        // It's safe to break out here because filter.needsVerification()
+                        // can only be true if filter.handlesWebUris(true) returns true, so
                         // we've already noted that.
                         break;
                     }
                 }
             }
 
-            // Compare the new set of recognized hosts if the app is either requesting
-            // autoVerify or has previously used autoVerify but no longer does.
-            if (needToRunVerify || previouslyVerified) {
+            // Note whether this app publishes any web navigation handling support at all,
+            // and whether there are any web-nav filters that fit the profile for running
+            // a verification pass now.
+            if (needToVerify) {
                 final int verificationId = mIntentFilterVerificationToken++;
                 for (PackageParser.Activity a : pkg.activities) {
                     for (ActivityIntentInfo filter : a.intents) {
@@ -18341,15 +18336,24 @@ public class PackageManagerService extends IPackageManager.Stub
             }
         }
 
-        if (needToRunVerify && count > 0) {
-            // app requested autoVerify and has at least one matching intent filter
+        if (count > 0) {
+            // count > 0 means that we're running a full verification pass
             if (DEBUG_DOMAIN_VERIFICATION) Slog.d(TAG, "Starting " + count
                     + " IntentFilter verification" + (count > 1 ? "s" : "")
                     +  " for userId:" + userId);
             mIntentFilterVerifier.startVerifications(userId);
+        } else if (alreadyVerified && handlesWebUris) {
+            // App used autoVerify in the past, no longer does, but still handles web
+            // navigation starts.
+            if (DEBUG_DOMAIN_VERIFICATION) {
+                Slog.d(TAG, "App changed web filters but no longer verifying - resetting policy");
+            }
+            synchronized (mPackages) {
+                clearIntentFilterVerificationsLPw(packageName, userId);
+            }
         } else {
             if (DEBUG_DOMAIN_VERIFICATION) {
-                Slog.d(TAG, "No web filters or no new host policy for " + packageName);
+                Slog.d(TAG, "No web filters or no prior verify policy for " + packageName);
             }
         }
     }
