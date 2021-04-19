@@ -575,9 +575,6 @@ public class FaceService extends BiometricServiceBase {
     /**
      * Receives the incoming binder calls from FaceManager.
      */
-    private final class FaceServiceWrapper extends IFaceService.Stub {
-        private static final int ENROLL_TIMEOUT_SEC = 75;
-
         /**
          * The following methods contain common code which is shared in biometrics/common.
          */
